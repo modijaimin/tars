@@ -1,20 +1,11 @@
 FROM python:3.12-slim
 
-# Install supervisord, curl, ca-certificates, gnupg
+# Install supervisord, curl, ca-certificates
 # Note: Java not needed — we use the signal-cli native binary (self-contained)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     supervisor \
     curl \
     ca-certificates \
-    gnupg \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Tailscale
-RUN curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.noarch.list \
-    | tee /etc/apt/sources.list.d/tailscale.list \
-    && curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.gpg.key \
-    | gpg --dearmor -o /etc/apt/trusted.gpg.d/tailscale.gpg \
-    && apt-get update && apt-get install -y tailscale \
     && rm -rf /var/lib/apt/lists/*
 
 # Install signal-cli (native binary — no JVM needed)
