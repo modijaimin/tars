@@ -1,7 +1,9 @@
 import asyncio
 import logging
+import subprocess
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 logger = logging.getLogger(__name__)
 
@@ -60,3 +62,25 @@ app.include_router(shortcuts_router)
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+_link_security = HTTPBearer(auto_error=False)
+
+@app.get("/setup/link-signal")
+async def link_signal(credentials: HTTPAuthorizationCredentials | None = Depends(_link_security)):
+    from server.config import settings
+    if settings and settings.webhook_secret:
+        if not credentials or credentials.credentials != settings.webhook_secret:
+            raise HTTPException(status_code=403, detail="Forbidden")
+    proc = await asyncio.create_subprocess_exec(
+        "/usr/local/bin/signal-cli", "--config", "/data/signal-cli",
+        "link", "-n", "personal-tars",
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    # Read just the first line — the sgnl:// URI
+    line = await asyncio.wait_for(proc.stdout.readline(), timeout=15.0)
+    uri = line.decode().strip()
+    if not uri.startswith("sgnl://"):
+        stderr = await proc.stderr.read()
+        raise HTTPException(status_code=500, detail=stderr.decode())
+    return {"uri": uri, "qr_url": f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={uri}"}
