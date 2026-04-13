@@ -44,6 +44,12 @@ def test_webhook_rejects_missing_auth(client, monkeypatch):
     resp = client.post("/webhook", json={"text": "add milk", "source": "shortcuts"})
     assert resp.status_code == 403
 
+def test_webhook_rejects_missing_text_field(client, monkeypatch):
+    from server import config
+    monkeypatch.setattr(config, "settings", type("S", (), {"webhook_secret": ""})())
+    resp = client.post("/webhook", json={"source": "shortcuts"})
+    assert resp.status_code == 422
+
 def test_webhook_rejects_empty_text(client, auth_headers, monkeypatch):
     from server import config
     monkeypatch.setattr(config, "settings", type("S", (), {"webhook_secret": ""})())
