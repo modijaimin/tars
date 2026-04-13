@@ -31,14 +31,14 @@ class SignalClient:
             raise RuntimeError(f"signal-cli send failed: {resp.text}")
         logger.info("Signal message sent to %s", recipient)
 
-    async def receive(self) -> list[dict]:
+    async def receive(self, timeout: float = 60.0) -> list[dict]:
         payload = {
             "jsonrpc": "2.0",
             "method": "receive",
             "params": {"account": self.account},
             "id": self._next_id(),
         }
-        async with httpx.AsyncClient(timeout=10.0) as http:
+        async with httpx.AsyncClient(timeout=timeout) as http:
             resp = await http.post(f"{self.base_url}/api/v1/rpc", json=payload)
         if resp.status_code != 200:
             return []

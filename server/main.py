@@ -8,13 +8,24 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from server.handlers.signal_handler import signal_client, handle_incoming_signal
+    from server.handlers.signal_handler import handle_incoming_signal
+    from server.integrations.signal_client import SignalClient
     from server.config import settings
+
+    if not settings or not settings.signal_account:
+        logger.warning("SIGNAL_ACCOUNT not configured — Signal polling disabled")
+        yield
+        return
+
+    signal_client = SignalClient(
+        base_url=settings.signal_base_url,
+        account=settings.signal_account,
+    )
 
     async def signal_poll_loop():
         while True:
             try:
-                envelopes = await signal_client.receive()
+                envelopes = await signal_client.receive(timeout=60.0)
                 for envelope in envelopes:
                     data_msg = envelope.get("dataMessage")
                     if not data_msg:
@@ -22,10 +33,12 @@ async def lifespan(app: FastAPI):
                     source = envelope.get("source", "")
                     text = data_msg.get("message", "").strip()
                     if text and source:
-                        await handle_incoming_signal(source, text)
+                        await handle_incoming_signal(source, text, signal_client)
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 logger.error("Signal poll error: %s", e)
-            await asyncio.sleep(2)
+                await asyncio.sleep(2)
 
     task = asyncio.create_task(signal_poll_loop())
     yield

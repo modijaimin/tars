@@ -31,9 +31,30 @@ async def test_receive_returns_envelopes(client):
         mock_post.return_value.json = lambda: {
             "result": [{"source": "+15551234567", "dataMessage": {"message": "hi"}}]
         }
-        result = await client.receive()
+        result = await client.receive(timeout=60.0)
         assert len(result) == 1
         assert result[0]["source"] == "+15551234567"
+
+@pytest.mark.asyncio
+async def test_receive_default_timeout(client):
+    """receive() should use 60s timeout by default (not 10s)."""
+    with patch("httpx.AsyncClient.__init__", return_value=None) as mock_init, \
+         patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post, \
+         patch("httpx.AsyncClient.__aenter__", new_callable=AsyncMock) as mock_aenter, \
+         patch("httpx.AsyncClient.__aexit__", new_callable=AsyncMock):
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json = lambda: {"result": []}
+        mock_aenter.return_value = AsyncMock(post=mock_post)
+        # instantiate with explicit context manager mock
+        import httpx
+        with patch.object(httpx, "AsyncClient") as mock_cls:
+            mock_instance = AsyncMock()
+            mock_instance.post.return_value.status_code = 200
+            mock_instance.post.return_value.json = lambda: {"result": []}
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_instance)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+            await client.receive()
+            mock_cls.assert_called_once_with(timeout=60.0)
 
 @pytest.mark.asyncio
 async def test_receive_returns_empty_on_failure(client):
