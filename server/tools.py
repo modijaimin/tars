@@ -2,6 +2,22 @@ from pathlib import Path
 from datetime import datetime
 import re
 
+try:
+    from server.integrations.google_calendar import get_upcoming_events, add_calendar_event
+    _calendar_available = True
+except Exception:
+    _calendar_available = False
+
+def _get_upcoming_events_safe(days: int) -> str:
+    if not _calendar_available:
+        return "Google Calendar not configured."
+    return get_upcoming_events(days)
+
+def _add_calendar_event_safe(summary: str, start: str, end: str) -> str:
+    if not _calendar_available:
+        return "Google Calendar not configured."
+    return add_calendar_event(summary, start, end)
+
 NOTES_DIR = Path("/data/notes")
 
 def _ensure_notes_dir():
@@ -126,6 +142,30 @@ TOOLS = [
             "required": ["description"],
         },
     },
+    {
+        "name": "get_calendar",
+        "description": "Get upcoming calendar events.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "days": {"type": "integer", "description": "Number of days to look ahead (default 3)"}
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "add_event",
+        "description": "Add an event to personal calendar.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string"},
+                "start": {"type": "string", "description": "ISO 8601 datetime"},
+                "end": {"type": "string", "description": "ISO 8601 datetime"},
+            },
+            "required": ["summary", "start", "end"],
+        },
+    },
 ]
 
 async def execute_tools(content: list) -> list:
@@ -137,6 +177,8 @@ async def execute_tools(content: list) -> list:
         "read_tasks": lambda i: read_tasks(),
         "add_task": lambda i: add_task(i["description"]),
         "complete_task": lambda i: complete_task(i["description"]),
+        "get_calendar": lambda i: _get_upcoming_events_safe(i.get("days", 3)),
+        "add_event": lambda i: _add_calendar_event_safe(i["summary"], i["start"], i["end"]),
     }
     for block in content:
         if block.type == "tool_use":
