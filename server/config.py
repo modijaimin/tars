@@ -11,9 +11,9 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str
     anthropic_base_url: str = "https://api.circle.com/v1/platformai/proxy/anthropic"
-    google_client_id: str
-    google_client_secret: str
-    google_refresh_token: str
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_refresh_token: str = ""
     calendar_timezone: str = "America/Chicago"
     signal_account: str = ""  # E.164 format, e.g. +15551234567
     signal_base_url: str = "http://127.0.0.1:7583"

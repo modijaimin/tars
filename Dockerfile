@@ -11,8 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install signal-cli (native binary — no JVM needed)
 ARG SIGNAL_CLI_VERSION=0.13.4
 RUN curl -fsSL "https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}-Linux-native.tar.gz" \
-    | tar -xz -C /opt \
-    && ln -sf /opt/signal-cli-${SIGNAL_CLI_VERSION}/bin/signal-cli /usr/local/bin/signal-cli
+    | tar -xz -C /usr/local/bin \
+    && chmod +x /usr/local/bin/signal-cli
 
 WORKDIR /app
 
