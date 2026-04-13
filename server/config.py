@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     google_client_id: str
     google_client_secret: str
     google_refresh_token: str
+    calendar_timezone: str = "America/Chicago"
     signal_account: str = ""  # E.164 format, e.g. +15551234567
     signal_base_url: str = "http://127.0.0.1:7583"
     webhook_secret: str = ""

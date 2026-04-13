@@ -16,6 +16,8 @@ def _get_upcoming_events_safe(days: int) -> str:
 def _add_calendar_event_safe(summary: str, start: str, end: str) -> str:
     if not _calendar_available:
         return "Google Calendar not configured."
+    if not summary or not start or not end:
+        return "add_event requires summary, start, and end."
     return add_calendar_event(summary, start, end)
 
 NOTES_DIR = Path("/data/notes")
@@ -178,7 +180,11 @@ async def execute_tools(content: list) -> list:
         "add_task": lambda i: add_task(i["description"]),
         "complete_task": lambda i: complete_task(i["description"]),
         "get_calendar": lambda i: _get_upcoming_events_safe(i.get("days", 3)),
-        "add_event": lambda i: _add_calendar_event_safe(i["summary"], i["start"], i["end"]),
+        "add_event": lambda i: _add_calendar_event_safe(
+            i.get("summary", ""),
+            i.get("start", ""),
+            i.get("end", ""),
+        ),
     }
     for block in content:
         if block.type == "tool_use":
