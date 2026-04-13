@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     from server.handlers.signal_handler import handle_incoming_signal
     from server.integrations.signal_client import SignalClient
+    from server.reminders import start_scheduler
     from server.config import settings
 
     if not settings or not settings.signal_account:
@@ -21,6 +22,8 @@ async def lifespan(app: FastAPI):
         base_url=settings.signal_base_url,
         account=settings.signal_account,
     )
+
+    scheduler = start_scheduler(signal_client, settings.signal_account)
 
     async def signal_poll_loop():
         while True:
@@ -43,6 +46,7 @@ async def lifespan(app: FastAPI):
     task = asyncio.create_task(signal_poll_loop())
     yield
     task.cancel()
+    scheduler.shutdown()
 
 
 app = FastAPI(title="Personal TARS", lifespan=lifespan)

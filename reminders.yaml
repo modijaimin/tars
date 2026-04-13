@@ -1,1 +1,13 @@
-reminders: []
+reminders:
+  - label: "Seetha's birthday"
+    month: 3
+    day: 25
+    advance_days: [7, 3, 1]
+  - label: "Jia's birthday"
+    month: 5
+    day: 21
+    advance_days: [7, 3, 1]
+  - label: "Jai's birthday"
+    month: 10
+    day: 14
+    advance_days: [7, 3, 1]
