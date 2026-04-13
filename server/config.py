@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     google_client_id: str
     google_client_secret: str
     google_refresh_token: str
+    signal_account: str = ""  # E.164 format, e.g. +15551234567
 
 
 def get_settings() -> Settings:
