@@ -32,8 +32,10 @@ async def webhook(
     req: ShortcutsRequest,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ):
-    # Auth: only enforce if webhook_secret is configured
-    if settings and settings.webhook_secret:
+    # Auth: fail closed if config is missing; enforce token if webhook_secret is set
+    if not settings:
+        raise HTTPException(status_code=500, detail="Server misconfigured")
+    if settings.webhook_secret:
         if not credentials or credentials.credentials != settings.webhook_secret:
             raise HTTPException(status_code=403, detail="Forbidden")
 
