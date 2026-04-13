@@ -1,8 +1,12 @@
 import asyncio
+import base64
+import io
 import logging
 import subprocess
+import tarfile
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Depends
+from pathlib import Path
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 logger = logging.getLogger(__name__)
@@ -130,3 +134,41 @@ async def finish_link(credentials: HTTPAuthorizationCredentials | None = Depends
     )
     await start.wait()
     return {"status": "signal-cli restarted"}
+
+
+@app.post("/setup/upload-signal-config")
+async def upload_signal_config(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_link_security),
+):
+    """Accept a base64-encoded tar.gz of a local signal-cli config and install it."""
+    _check_auth(credentials)
+
+    body = await request.json()
+    config_b64 = body.get("config", "")
+    if not config_b64:
+        raise HTTPException(status_code=422, detail="Missing 'config' field (base64-encoded tar.gz)")
+
+    # Stop daemon so it releases any file handles
+    stop = await asyncio.create_subprocess_exec(
+        "supervisorctl", "stop", "signal-cli",
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    await stop.wait()
+    await asyncio.sleep(1)
+
+    config_dir = Path("/data/signal-cli")
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    raw = base64.b64decode(config_b64)
+    with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as tf:
+        tf.extractall(config_dir, filter="data")
+
+    # Restart daemon with the new config
+    start = await asyncio.create_subprocess_exec(
+        "supervisorctl", "start", "signal-cli",
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    await start.wait()
+
+    return {"status": "config installed, signal-cli restarted"}
