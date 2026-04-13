@@ -65,22 +65,68 @@ async def health():
 
 
 _link_security = HTTPBearer(auto_error=False)
+_link_proc = None  # global handle for the in-progress link process
 
-@app.get("/setup/link-signal")
-async def link_signal(credentials: HTTPAuthorizationCredentials | None = Depends(_link_security)):
+
+def _check_auth(credentials):
     from server.config import settings
     if settings and settings.webhook_secret:
         if not credentials or credentials.credentials != settings.webhook_secret:
             raise HTTPException(status_code=403, detail="Forbidden")
-    proc = await asyncio.create_subprocess_exec(
+
+
+@app.get("/setup/link-signal")
+async def link_signal(credentials: HTTPAuthorizationCredentials | None = Depends(_link_security)):
+    global _link_proc
+    _check_auth(credentials)
+
+    # Stop the signal-cli daemon so link can run standalone
+    stop = await asyncio.create_subprocess_exec(
+        "supervisorctl", "stop", "signal-cli",
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    await stop.wait()
+    await asyncio.sleep(1)
+
+    # Run signal-cli link standalone
+    _link_proc = await asyncio.create_subprocess_exec(
         "/usr/local/bin/signal-cli", "--config", "/data/signal-cli",
         "link", "-n", "personal-tars",
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
-    # Read just the first line — the sgnl:// URI
-    line = await asyncio.wait_for(proc.stdout.readline(), timeout=15.0)
+    try:
+        line = await asyncio.wait_for(_link_proc.stdout.readline(), timeout=15.0)
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=500, detail="Timed out waiting for link URI")
+
     uri = line.decode().strip()
     if not uri.startswith("sgnl://"):
-        stderr = await proc.stderr.read()
-        raise HTTPException(status_code=500, detail=stderr.decode())
-    return {"uri": uri, "qr_url": f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={uri}"}
+        err = (await _link_proc.stderr.read()).decode()
+        raise HTTPException(status_code=500, detail=f"Unexpected output: {uri!r} | stderr: {err}")
+
+    return {
+        "uri": uri,
+        "qr_url": f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={uri}",
+        "next": "Scan QR, then call GET /setup/finish-link",
+    }
+
+
+@app.get("/setup/finish-link")
+async def finish_link(credentials: HTTPAuthorizationCredentials | None = Depends(_link_security)):
+    global _link_proc
+    _check_auth(credentials)
+
+    if _link_proc:
+        try:
+            await asyncio.wait_for(_link_proc.wait(), timeout=5.0)
+        except asyncio.TimeoutError:
+            _link_proc.terminate()
+        _link_proc = None
+
+    # Restart signal-cli daemon via supervisord
+    start = await asyncio.create_subprocess_exec(
+        "supervisorctl", "start", "signal-cli",
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    await start.wait()
+    return {"status": "signal-cli restarted"}
