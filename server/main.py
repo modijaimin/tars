@@ -48,7 +48,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Personal TARS", lifespan=lifespan)
 
 from server.handlers.signal_handler import router as signal_router
+from server.handlers.shortcuts_handler import router as shortcuts_router
 app.include_router(signal_router)
+app.include_router(shortcuts_router)
 
 
 @app.get("/health")

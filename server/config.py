@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     google_refresh_token: str
     signal_account: str = ""  # E.164 format, e.g. +15551234567
     signal_base_url: str = "http://127.0.0.1:7583"
+    webhook_secret: str = ""
 
 
 def get_settings() -> Settings:
