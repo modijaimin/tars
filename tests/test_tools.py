@@ -30,4 +30,4 @@ def test_complete_task(notes_dir, monkeypatch):
     tools.add_task("Test task")
     tools.complete_task("Test task")
     tasks = tools.read_tasks()
-    assert "Test task" not in tasks or "~~Test task~~" in tasks
+    assert "Test task" not in tasks

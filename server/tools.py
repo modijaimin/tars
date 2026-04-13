@@ -20,9 +20,10 @@ def write_note(filename: str, content: str) -> str:
 
 def read_note(filename: str) -> str:
     _ensure_notes_dir()
-    path = NOTES_DIR / filename
+    safe = re.sub(r"[^a-zA-Z0-9_\-.]", "_", filename)
+    path = NOTES_DIR / safe
     if not path.exists():
-        return f"Note not found: {filename}"
+        return f"Note not found: {safe}"
     return path.read_text()
 
 def list_notes() -> list[str]:
@@ -56,15 +57,18 @@ def add_task(description: str) -> str:
     return f"Task added: {description.strip()}"
 
 def complete_task(description: str) -> str:
+    _ensure_notes_dir()
     lines = _read_task_lines()
     updated = []
     found = False
     for line in lines:
-        if description.lower() in line.lower() and "- [ ]" in line:
-            updated.append(line.replace("- [ ]", "- [x]"))
-            found = True
-        else:
-            updated.append(line)
+        if "- [ ]" in line:
+            task_text = line.removeprefix("- [ ] ").strip()
+            if task_text.lower() == description.strip().lower():
+                updated.append(line.replace("- [ ]", "- [x]", 1))
+                found = True
+                continue
+        updated.append(line)
     if not found:
         return f"Task not found: {description}"
     _tasks_file().write_text("\n".join(updated) + "\n")
@@ -97,12 +101,12 @@ TOOLS = [
     {
         "name": "list_notes",
         "description": "List all saved notes.",
-        "input_schema": {"type": "object", "properties": {}},
+        "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
         "name": "read_tasks",
         "description": "Read all open tasks.",
-        "input_schema": {"type": "object", "properties": {}},
+        "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
         "name": "add_task",
@@ -137,7 +141,10 @@ async def execute_tools(content: list) -> list:
     for block in content:
         if block.type == "tool_use":
             fn = tool_map.get(block.name)
-            result = fn(block.input) if fn else f"Unknown tool: {block.name}"
+            try:
+                result = fn(block.input) if fn else f"Unknown tool: {block.name}"
+            except Exception as e:
+                result = f"Tool error: {e}"
             results.append({
                 "type": "tool_result",
                 "tool_use_id": block.id,
